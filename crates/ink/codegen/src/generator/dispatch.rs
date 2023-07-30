@@ -436,6 +436,7 @@ impl Dispatch<'_> {
             }
 
             #[cfg(target_arch = "riscv32")]
+            #[link_section = ".init"]
             #[no_mangle]
             pub extern "C" fn _start(call_flags: u32) {
                 let is_deploy = (call_flags & 0x0000_0001) == 1;

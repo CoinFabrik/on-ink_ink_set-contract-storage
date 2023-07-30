@@ -19,11 +19,11 @@ use super::{
     Result,
     ReturnCode,
 };
-use crate::ReturnFlags;
+use crate::{
+    engine::on_chain::EncodeScope,
+    ReturnFlags,
+};
 use scale::Encode;
-
-// TODO: Remove the constant and use the real func ids.
-const FUNC_ID: u32 = 0;
 
 mod sys {
     use super::{
@@ -73,7 +73,8 @@ pub fn instantiate(
 ) -> Result {
     let mut address_len = out_address.len() as u32;
     let mut return_value_len = out_return_value.len() as u32;
-    let ret_code = (
+    let mut in_data = [0u8; 64];
+    (
         Ptr32::from_slice(code_hash),
         gas_limit,
         Ptr32::from_slice(endowment),
@@ -86,7 +87,8 @@ pub fn instantiate(
         Ptr32::from_slice(salt),
         salt.len() as u32,
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(10, Ptr32::from_slice(&in_data));
     extract_from_slice(out_address, address_len as usize);
     extract_from_slice(out_return_value, return_value_len as usize);
     ret_code.into()
@@ -101,7 +103,8 @@ pub fn call(
     output: &mut &mut [u8],
 ) -> Result {
     let mut output_len = output.len() as u32;
-    let ret_code = (
+    let mut in_data = [0u8; 64];
+    (
         flags,
         Ptr32::from_slice(callee),
         gas_limit,
@@ -111,7 +114,8 @@ pub fn call(
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(7, Ptr32::from_slice(&in_data));
     extract_from_slice(output, output_len as usize);
     ret_code.into()
 }
@@ -123,7 +127,8 @@ pub fn delegate_call(
     output: &mut &mut [u8],
 ) -> Result {
     let mut output_len = output.len() as u32;
-    let ret_code = (
+    let mut in_data = [0u8; 64];
+    (
         flags,
         Ptr32::from_slice(code_hash),
         Ptr32::from_slice(input),
@@ -131,84 +136,100 @@ pub fn delegate_call(
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(9, Ptr32::from_slice(&in_data));
     extract_from_slice(output, output_len as usize);
     ret_code.into()
 }
 
 pub fn transfer(account_id: &[u8], value: &[u8]) -> Result {
-    let ret_code = (
+    let mut in_data = [0u8; 32];
+    (
         Ptr32::from_slice(account_id),
         account_id.len() as u32,
         Ptr32::from_slice(value),
         value.len() as u32,
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(6, Ptr32::from_slice(&in_data));
     ret_code.into()
 }
 
 pub fn deposit_event(topics: &[u8], data: &[u8]) {
+    let mut in_data = [0u8; 32];
     (
         Ptr32::from_slice(topics),
         topics.len() as u32,
         Ptr32::from_slice(data),
         data.len() as u32,
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    sys::call(30, Ptr32::from_slice(&in_data));
 }
 
 pub fn set_storage(key: &[u8], encoded_value: &[u8]) -> Option<u32> {
-    let ret_code = (
+    let mut in_data = [0u8; 32];
+    (
         Ptr32::from_slice(key),
         key.len() as u32,
         Ptr32::from_slice(encoded_value),
         encoded_value.len() as u32,
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(1, Ptr32::from_slice(&in_data));
     ret_code.into()
 }
 
 pub fn clear_storage(key: &[u8]) -> Option<u32> {
-    let ret_code = (Ptr32::from_slice(key), key.len() as u32)
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+    let mut in_data = [0u8; 16];
+    (Ptr32::from_slice(key), key.len() as u32)
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(2, Ptr32::from_slice(&in_data));
     ret_code.into()
 }
 
 pub fn get_storage(key: &[u8], output: &mut &mut [u8]) -> Result {
     let mut output_len = output.len() as u32;
-    let ret_code = (
+    let mut in_data = [0u8; 32];
+    (
         Ptr32::from_slice(key),
         key.len() as u32,
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(3, Ptr32::from_slice(&in_data));
     extract_from_slice(output, output_len as usize);
     ret_code.into()
 }
 
 pub fn take_storage(key: &[u8], output: &mut &mut [u8]) -> Result {
     let mut output_len = output.len() as u32;
-    let ret_code = (
+    let mut in_data = [0u8; 32];
+    (
         Ptr32::from_slice(key),
         key.len() as u32,
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(5, Ptr32::from_slice(&in_data));
     extract_from_slice(output, output_len as usize);
     ret_code.into()
 }
 
 pub fn storage_contains(key: &[u8]) -> Option<u32> {
-    let ret_code = (Ptr32::from_slice(key), key.len() as u32)
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+    let mut in_data = [0u8; 16];
+    (Ptr32::from_slice(key), key.len() as u32)
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(4, Ptr32::from_slice(&in_data));
     ret_code.into()
 }
 
 pub fn terminate(beneficiary: &[u8]) -> ! {
-    (Ptr32::from_slice(beneficiary))
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+    let mut in_data = [0u8; 16];
+    Ptr32::from_slice(beneficiary).encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    sys::call(12, Ptr32::from_slice(&in_data));
     unsafe {
         core::hint::unreachable_unchecked();
     }
@@ -216,81 +237,86 @@ pub fn terminate(beneficiary: &[u8]) -> ! {
 
 pub fn call_chain_extension(func_id: u32, input: &[u8], output: &mut &mut [u8]) -> u32 {
     let mut output_len = output.len() as u32;
-    let ret_code = (
+    let mut in_data = [0u8; 32];
+    (
         func_id,
         Ptr32::from_slice(input),
         input.len() as u32,
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(36, Ptr32::from_slice(&in_data));
     extract_from_slice(output, output_len as usize);
     ret_code.into_u32()
 }
 
 pub fn input(output: &mut &mut [u8]) {
     let mut output_len = output.len() as u32;
+    let mut in_data = [0u8; 16];
     (
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    sys::call(13, Ptr32::from_slice(&in_data));
     extract_from_slice(output, output_len as usize);
 }
 
 pub fn return_value(flags: ReturnFlags, return_value: &[u8]) -> ! {
+    let mut in_data = [0u8; 32];
     (
         flags.into_u32(),
         Ptr32::from_slice(return_value),
         return_value.len() as u32,
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    sys::call(14, Ptr32::from_slice(&in_data));
     unsafe {
         core::hint::unreachable_unchecked();
     }
 }
 
 pub fn call_runtime(call: &[u8]) -> Result {
-    let ret_code = (Ptr32::from_slice(call), call.len() as u32)
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+    let mut in_data = [0u8; 16];
+    (Ptr32::from_slice(call), call.len() as u32)
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(38, Ptr32::from_slice(&in_data));
     ret_code.into()
 }
 
 macro_rules! impl_wrapper_for {
-    ( $( $name:ident, )* ) => {
-        $(
-
-            pub fn $name(output: &mut &mut [u8]) {
-                let mut output_len = output.len() as u32;
-                (
-                    Ptr32Mut::from_slice(output),
-                    Ptr32Mut::from_ref(&mut output_len),
-                ).using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
-            }
-        )*
+    ( $name:ident, $syscall_no:literal ) => {
+        pub fn $name(output: &mut &mut [u8]) {
+            let mut output_len = output.len() as u32;
+            let mut in_data = [0u8; 8];
+            (
+                Ptr32Mut::from_slice(output),
+                Ptr32Mut::from_ref(&mut output_len),
+            ).encode_to(&mut EncodeScope::from(in_data.as_mut()));
+            sys::call($syscall_no, Ptr32::from_slice(&in_data));
+        }
     }
 }
-impl_wrapper_for! {
-    caller,
-    block_number,
-    address,
-    balance,
-    gas_left,
-    value_transferred,
-    now,
-    minimum_balance,
-}
+impl_wrapper_for!(caller, 15);
+impl_wrapper_for!(block_number, 31);
+impl_wrapper_for!(address, 21);
+impl_wrapper_for!(balance, 26);
+impl_wrapper_for!(gas_left, 24);
+impl_wrapper_for!(value_transferred, 27);
+impl_wrapper_for!(now, 28);
+impl_wrapper_for!(minimum_balance, 29);
 
 pub fn weight_to_fee(gas: u64, output: &mut &mut [u8]) {
     let mut output_len = output.len() as u32;
-    {
-        (
-            gas,
-            Ptr32Mut::from_slice(output),
-            Ptr32Mut::from_ref(&mut output_len),
-        )
-            .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
-    }
+    let mut in_data = [0u8; 32];
+    (
+        gas,
+        Ptr32Mut::from_slice(output),
+        Ptr32Mut::from_ref(&mut output_len),
+    )
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    sys::call(22, Ptr32::from_slice(&in_data));
     extract_from_slice(output, output_len as usize);
 }
 
@@ -318,8 +344,10 @@ pub fn debug_message(message: &str) {
     // could lead to a out of gas error.
     if unsafe { DEBUG_ENABLED || FIRST_RUN } {
         let bytes = message.as_bytes();
-        let ret_code = (Ptr32::from_slice(bytes), bytes.len() as u32)
-            .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        let mut in_data = [0u8; 16];
+        (Ptr32::from_slice(bytes), bytes.len() as u32)
+            .encode_to(&mut EncodeScope::from(&mut in_data.as_mut()));
+        let ret_code = sys::call(29, Ptr32::from_slice(&in_data));
         if !matches!(ret_code.into(), Err(super::Error::LoggingDisabled)) {
             // SAFETY: safe because executing in a single threaded context
             unsafe { DEBUG_ENABLED = true }
@@ -334,40 +362,46 @@ pub fn debug_message(message: &str) {
 pub fn debug_message(_message: &str) {}
 
 macro_rules! impl_hash_fn {
-    ( $name:ident, $bytes_result:literal ) => {
+    ( $name:ident, $bytes_result:literal, $syscall_no:literal ) => {
         paste::item! {
             pub fn [<hash_ $name>](input: &[u8], output: &mut [u8; $bytes_result]) {
+                let mut in_data = [0u8; 32];
                 (
                     Ptr32::from_slice(input),
                     input.len() as u32,
                     Ptr32Mut::from_slice(output),
-                ).using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+                ).encode_to(&mut EncodeScope::from(in_data.as_mut()));
+                sys::call($syscall_no, Ptr32::from_slice(&in_data));
             }
         }
     };
 }
-impl_hash_fn!(sha2_256, 32);
-impl_hash_fn!(keccak_256, 32);
-impl_hash_fn!(blake2_256, 32);
-impl_hash_fn!(blake2_128, 16);
+impl_hash_fn!(sha2_256, 32, 32);
+impl_hash_fn!(keccak_256, 32, 33);
+impl_hash_fn!(blake2_256, 32, 34);
+impl_hash_fn!(blake2_128, 16, 35);
 
 pub fn ecdsa_recover(
     signature: &[u8; 65],
     message_hash: &[u8; 32],
     output: &mut [u8; 33],
 ) -> Result {
-    let ret_code = (
+    let mut in_data = [0u8; 32];
+    (
         Ptr32::from_slice(signature),
         Ptr32::from_slice(message_hash),
         Ptr32Mut::from_slice(output),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(39, Ptr32::from_slice(&in_data));
     ret_code.into()
 }
 
 pub fn ecdsa_to_eth_address(pubkey: &[u8; 33], output: &mut [u8; 20]) -> Result {
-    let ret_code = (Ptr32::from_slice(pubkey), Ptr32Mut::from_slice(output))
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+    let mut in_data = [0u8; 16];
+    (Ptr32::from_slice(pubkey), Ptr32Mut::from_slice(output))
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(42, Ptr32::from_slice(&in_data));
     ret_code.into()
 }
 
@@ -389,36 +423,40 @@ pub fn sr25519_verify(
 }
 
 pub fn is_contract(account_id: &[u8]) -> bool {
-    let ret_val = sys::call(FUNC_ID, Ptr32::from_slice(account_id));
+    let ret_val = sys::call(16, Ptr32::from_slice(account_id));
     ret_val.into_bool()
 }
 
 pub fn caller_is_origin() -> bool {
-    let ret_val = sys::call0(FUNC_ID);
+    let ret_val = sys::call0(19);
     ret_val.into_bool()
 }
 
 pub fn set_code_hash(code_hash: &[u8]) -> Result {
-    let ret_val = sys::call(FUNC_ID, Ptr32::from_slice(code_hash));
+    let ret_val = sys::call(41, Ptr32::from_slice(code_hash));
     ret_val.into()
 }
 
 pub fn code_hash(account_id: &[u8], output: &mut [u8]) -> Result {
     let mut output_len = output.len() as u32;
-    let ret_val = (
+    let mut in_data = [0u8; 32];
+    (
         Ptr32::from_slice(account_id),
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
-    ret_val.into()
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    let ret_code = sys::call(14, Ptr32::from_slice(&in_data));
+    ret_code.into()
 }
 
 pub fn own_code_hash(output: &mut [u8]) {
     let mut output_len = output.len() as u32;
+    let mut in_data = [0u8; 16];
     (
         Ptr32Mut::from_slice(output),
         Ptr32Mut::from_ref(&mut output_len),
     )
-        .using_encoded(|in_data| sys::call(FUNC_ID, Ptr32::from_slice(in_data)));
+        .encode_to(&mut EncodeScope::from(in_data.as_mut()));
+    sys::call(18, Ptr32::from_slice(&in_data));
 }
