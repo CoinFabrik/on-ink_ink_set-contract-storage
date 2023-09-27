@@ -229,15 +229,6 @@ impl Engine {
         let callee = self.get_callee();
         let account_id = AccountId::from_bytes(&callee[..]);
 
-        const SIZE_LIMIT: usize = (1 << 14) - 4;
-        assert!(
-            encoded_value.len() <= SIZE_LIMIT,
-            "the encoded value is too large! the encoded value is of size {} bytes, \
-            but the storage can only store values of up to {} bytes.",
-            encoded_value.len(),
-            SIZE_LIMIT,
-        );
-
         self.debug_info.inc_writes(account_id.clone());
         self.debug_info
             .record_cell_for_account(account_id, key.to_vec());
